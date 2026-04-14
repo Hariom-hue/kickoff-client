@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const API = "http://127.0.0.1:5000";
+const API = "https://kickoff-11.up.railway.app";
 
 const STATES = [
   "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
@@ -10,55 +10,34 @@ const STATES = [
   "Uttarakhand","West Bengal","Delhi","Jammu & Kashmir","Ladakh",
 ];
 
-const inp = {
-  width: "100%", padding: "11px 14px", background: "#161616",
-  border: "1px solid #2a2a2a", borderRadius: 9, color: "#fff",
-  fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif",
-  boxSizing: "border-box", transition: "border-color 0.2s",
-};
-
-const labelSm = {
-  display: "block", fontSize: 10, fontWeight: 700,
-  letterSpacing: "0.1em", textTransform: "uppercase",
-  color: "#555", marginBottom: 6,
-};
-
-const sectionBox = {
-  background: "#111", border: "1px solid #1e1e1e",
-  borderRadius: 16, marginBottom: 14, overflow: "hidden",
-};
-
-const sectionHead = {
-  display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: "16px 20px", borderBottom: "1px solid #1a1a1a",
-};
+const inp = { width: "100%", padding: "11px 14px", background: "#161616", border: "1px solid #2a2a2a", borderRadius: 9, color: "#fff", fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box", transition: "border-color 0.2s" };
+const labelSm = { display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#555", marginBottom: 6 };
+const sectionBox = { background: "#111", border: "1px solid #1e1e1e", borderRadius: 16, marginBottom: 14, overflow: "hidden" };
+const sectionHead = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #1a1a1a" };
 
 export default function Checkout({ cart, total, finalTotal: propFinalTotal, user, setCheckout, onOrderSuccess, Navbar, appliedOffer, setAppliedOffer, offers }) {
-  const [step, setStep] = useState(1);
-  const [placing, setPlacing] = useState(false);
-  const [orderDone, setOrderDone] = useState(false);
-  const [orderId, setOrderId] = useState("");
+  const [step,     setStep]     = useState(1);
+  const [placing,  setPlacing]  = useState(false);
+  const [orderDone,setOrderDone]= useState(false);
+  const [orderId,  setOrderId]  = useState("");
 
-  const [fullName,  setFullName]  = useState("");
-  const [phone,     setPhone]     = useState("");
-  const [pincode,   setPincode]   = useState("");
-  const [address1,  setAddress1]  = useState("");
-  const [address2,  setAddress2]  = useState("");
-  const [city,      setCity]      = useState("");
-  const [state,     setState]     = useState("Maharashtra");
-  const [addrType,  setAddrType]  = useState("Home");
-  const [pinInfo,   setPinInfo]   = useState(null);
-  const [pinErr,    setPinErr]    = useState("");
-  const [pinLoading,setPinLoading]= useState(false);
+  const [fullName,   setFullName]   = useState("");
+  const [phone,      setPhone]      = useState("");
+  const [pincode,    setPincode]    = useState("");
+  const [address1,   setAddress1]   = useState("");
+  const [address2,   setAddress2]   = useState("");
+  const [city,       setCity]       = useState("");
+  const [state,      setState]      = useState("Maharashtra");
+  const [addrType,   setAddrType]   = useState("Home");
+  const [pinInfo,    setPinInfo]    = useState(null);
+  const [pinErr,     setPinErr]     = useState("");
+  const [pinLoading, setPinLoading] = useState(false);
+  const [payMethod,  setPayMethod]  = useState("upi");
+  const [upiId,      setUpiId]      = useState("");
 
-  const [payMethod, setPayMethod] = useState("upi");
-  const [upiId,     setUpiId]     = useState("");
+  const discount   = appliedOffer ? appliedOffer.discount : 0;
+  const finalTotal = propFinalTotal ?? (total - discount);
 
-  const DELIVERY_CHARGE = 0;
-  const discount        = appliedOffer ? appliedOffer.discount : 0;
-  const finalTotal      = propFinalTotal ?? (total - discount);
-
-  /* ── PIN lookup ── */
   const checkPin = async (pin) => {
     if (pin.length !== 6) { setPinInfo(null); setPinErr(""); return; }
     setPinLoading(true); setPinErr(""); setPinInfo(null);
@@ -71,35 +50,92 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
     setPinLoading(false);
   };
 
-  /* ── Place order ── */
   const placeOrder = async () => {
     setPlacing(true);
     const fullAddress = `${fullName}, ${phone}\n${address1}${address2 ? ", " + address2 : ""}\n${city}, ${state} - ${pincode}`;
+
+    if (payMethod === "cod") {
+      try {
+        const res = await fetch(`${API}/order`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: cart, total: finalTotal, user, address: fullAddress, appliedOffer: appliedOffer ? appliedOffer.label : null, paymentId: "COD", paymentMethod: "cod" }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setOrderId("OD" + (data.orderId || Date.now().toString()).toString().slice(-10).toUpperCase());
+          setOrderDone(true);
+          if (onOrderSuccess) onOrderSuccess();
+        } else { alert("Order failed. Please try again."); }
+      } catch { alert("Server error"); }
+      setPlacing(false);
+      return;
+    }
+
+    // Online payment via Razorpay
     try {
-      const res = await fetch(`${API}/order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart, total: finalTotal, user,
-          address: fullAddress,
-          appliedOffer: appliedOffer ? appliedOffer.label : null,
-          paymentId: payMethod === "cod" ? "COD" : `${payMethod.toUpperCase()}-${Date.now()}`,
-          paymentMethod: payMethod,
-        }),
+      const orderRes = await fetch(`${API}/payment/create-order`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: finalTotal, receipt: `order_${Date.now()}` }),
       });
-      if (res.ok) {
-        const fakeId = "OD" + Date.now().toString().slice(-10);
-        setOrderId(fakeId);
-        setOrderDone(true);
-        if (onOrderSuccess) onOrderSuccess();
-      } else {
-        alert("Order failed. Please try again.");
-      }
-    } catch { alert("Server error"); }
-    setPlacing(false);
+      const orderData = await orderRes.json();
+      if (!orderData.success) { alert("Payment setup failed. Try again."); setPlacing(false); return; }
+
+      const options = {
+        key:         import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_SbRoyzz9sT1pWZ",
+        amount:      orderData.amount,
+        currency:    orderData.currency,
+        name:        "KICKOFF Store",
+        description: `${cart.length} item${cart.length !== 1 ? "s" : ""}`,
+        order_id:    orderData.orderId,
+        prefill:     { name: fullName, email: user || "", contact: phone },
+        theme:       { color: "#c8ff00" },
+        handler: async (response) => {
+          try {
+            const verifyRes = await fetch(`${API}/payment/verify`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) { alert("Payment verification failed. Contact support."); setPlacing(false); return; }
+
+            const saveRes = await fetch(`${API}/order`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                items: cart, total: finalTotal, user, address: fullAddress,
+                appliedOffer: appliedOffer ? appliedOffer.label : null,
+                paymentId:       response.razorpay_payment_id,
+                razorpayOrderId: response.razorpay_order_id,
+                paymentMethod:   payMethod,
+              }),
+            });
+            if (saveRes.ok) {
+              const saveData = await saveRes.json();
+              setOrderId("OD" + (saveData.orderId || Date.now().toString()).toString().slice(-10).toUpperCase());
+              setOrderDone(true);
+              if (onOrderSuccess) onOrderSuccess();
+            } else {
+              alert("Payment done but order save failed. Contact support. Payment ID: " + response.razorpay_payment_id);
+            }
+          } catch { alert("Verification error. Contact support."); }
+          setPlacing(false);
+        },
+        modal: { ondismiss: () => setPlacing(false) },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", (response) => { alert("Payment failed: " + response.error.description); setPlacing(false); });
+      rzp.open();
+    } catch (err) {
+      console.error("Payment error:", err);
+      alert("Payment setup failed. Check your connection.");
+      setPlacing(false);
+    }
   };
 
-  /* ── ORDER SUCCESS SCREEN ── */
   if (orderDone) {
     return (
       <div style={{ background: "#0a0a0a", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
@@ -108,8 +144,7 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
           <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(34,197,94,0.12)", border: "2px solid #22c55e", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", fontSize: 36 }}>✓</div>
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#22c55e", marginBottom: 8 }}>Order Confirmed</p>
           <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "2.8rem", color: "#fff", letterSpacing: "0.05em", marginBottom: 8 }}>Thank You!</h1>
-          <p style={{ color: "#555", fontSize: 14, marginBottom: 32 }}>Your order has been placed successfully.</p>
-
+          <p style={{ color: "#555", fontSize: 14, marginBottom: 32 }}>Your order has been placed successfully. A confirmation email has been sent.</p>
           <div style={{ background: "#111", border: "1px solid #1e1e1e", borderRadius: 16, padding: 24, textAlign: "left", marginBottom: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
               <span style={{ color: "#444", fontSize: 12 }}>Order ID</span>
@@ -134,8 +169,7 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
               <span style={{ color: "#22c55e", fontWeight: 700, fontSize: 13 }}>{pinInfo?.deliveryDate || "3–5 business days"}</span>
             </div>
           </div>
-
-          <button onClick={() => { setCheckout(false); }} style={{ width: "100%", padding: 14, background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+          <button onClick={() => setCheckout(false)} style={{ width: "100%", padding: 14, background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
             Continue Shopping
           </button>
         </div>
@@ -149,15 +183,15 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
     <div style={{ background: "#0a0a0a", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: 100 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap');
-        .co-inp:focus { border-color: #c8ff00 !important; }
-        .co-inp::placeholder { color: #333; }
-        .co-inp:hover { border-color: #444 !important; }
-        .pay-opt { cursor: pointer; transition: border-color 0.2s, background 0.2s; }
-        .pay-opt:hover { border-color: #444 !important; }
-        .addr-type-btn { transition: all 0.15s; }
-        .addr-type-btn:hover { border-color: #c8ff00 !important; color: #c8ff00 !important; }
-        .offer-chip { transition: border-color 0.15s, background 0.15s; cursor: pointer; }
-        .offer-chip:hover { border-color: #c8ff00 !important; }
+        .co-inp:focus{border-color:#c8ff00!important;}
+        .co-inp::placeholder{color:#333;}
+        .co-inp:hover{border-color:#444!important;}
+        .pay-opt{cursor:pointer;transition:border-color 0.2s,background 0.2s;}
+        .pay-opt:hover{border-color:#444!important;}
+        .addr-type-btn{transition:all 0.15s;}
+        .addr-type-btn:hover{border-color:#c8ff00!important;color:#c8ff00!important;}
+        .offer-chip{transition:border-color 0.15s,background 0.15s;cursor:pointer;}
+        .offer-chip:hover{border-color:#c8ff00!important;}
       `}</style>
 
       {Navbar}
@@ -169,7 +203,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px", display: "grid", gridTemplateColumns: "1fr 360px", gap: 20, alignItems: "start" }} className="co-grid">
         <style>{`.co-grid{grid-template-columns:1fr 360px} @media(max-width:800px){.co-grid{grid-template-columns:1fr!important;}}`}</style>
 
-        {/* ── LEFT COLUMN ── */}
         <div>
           {/* Step indicator */}
           <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 24 }}>
@@ -186,7 +219,7 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
             ))}
           </div>
 
-          {/* ══ STEP 1 — ADDRESS ══ */}
+          {/* STEP 1 */}
           {step === 1 && (
             <div style={sectionBox}>
               <div style={sectionHead}>
@@ -195,7 +228,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                   <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.6rem", color: "#fff", letterSpacing: "0.05em" }}>Delivery Address</h2>
                 </div>
               </div>
-
               <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
@@ -207,17 +239,14 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     <input type="tel" className="co-inp" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="10-digit number" style={inp} />
                   </div>
                 </div>
-
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                   <div>
                     <label style={labelSm}>PIN Code <span style={{ color: "#c8ff00" }}>*</span></label>
                     <div style={{ position: "relative" }}>
-                      <input type="text" className="co-inp" value={pincode} maxLength={6}
-                        onChange={e => { const v = e.target.value.replace(/\D/g, ""); setPincode(v); checkPin(v); }}
-                        placeholder="6-digit PIN" style={inp} />
+                      <input type="text" className="co-inp" value={pincode} maxLength={6} onChange={e => { const v = e.target.value.replace(/\D/g, ""); setPincode(v); checkPin(v); }} placeholder="6-digit PIN" style={inp} />
                       {pinLoading && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 11 }}>...</span>}
                     </div>
-                    {pinErr && <p style={{ color: "#ef4444", fontSize: 10, marginTop: 4 }}>{pinErr}</p>}
+                    {pinErr  && <p style={{ color: "#ef4444", fontSize: 10, marginTop: 4 }}>{pinErr}</p>}
                     {pinInfo && <p style={{ color: "#22c55e", fontSize: 10, marginTop: 4 }}>✓ {pinInfo.city}, {pinInfo.state}</p>}
                   </div>
                   <div>
@@ -231,7 +260,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     </select>
                   </div>
                 </div>
-
                 <div>
                   <label style={labelSm}>Flat, House No., Building <span style={{ color: "#c8ff00" }}>*</span></label>
                   <input type="text" className="co-inp" value={address1} onChange={e => setAddress1(e.target.value)} placeholder="e.g. Flat 4B, Sunshine Apartments" style={inp} />
@@ -240,7 +268,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                   <label style={labelSm}>Area, Colony, Street</label>
                   <input type="text" className="co-inp" value={address2} onChange={e => setAddress2(e.target.value)} placeholder="e.g. MG Road, Bandra West" style={inp} />
                 </div>
-
                 <div>
                   <label style={labelSm}>Address Type</label>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -252,7 +279,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     ))}
                   </div>
                 </div>
-
                 {pinInfo && (
                   <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 10, padding: "12px 16px" }}>
                     <span style={{ fontSize: 20 }}>🚚</span>
@@ -262,7 +288,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     </div>
                   </div>
                 )}
-
                 <button onClick={() => { if (!fullName.trim()) { alert("Enter your full name"); return; } if (phone.length !== 10) { alert("Enter a valid 10-digit mobile number"); return; } if (pincode.length !== 6) { alert("Enter a valid PIN code"); return; } if (!address1.trim()) { alert("Enter your flat/house details"); return; } if (!city.trim()) { alert("Enter your city"); return; } setStep(2); }}
                   style={{ padding: "13px", background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
                   Deliver to this Address →
@@ -271,7 +296,7 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
             </div>
           )}
 
-          {/* ══ STEP 2 — ORDER SUMMARY ══ */}
+          {/* STEP 2 */}
           {step === 2 && (
             <div style={sectionBox}>
               <div style={sectionHead}>
@@ -281,7 +306,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                 </div>
                 <button onClick={() => setStep(1)} style={{ background: "none", border: "1px solid #2a2a2a", borderRadius: 8, color: "#c8ff00", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", padding: "6px 14px", fontFamily: "'DM Sans', sans-serif" }}>Edit Address</button>
               </div>
-
               <div style={{ margin: "0 20px", marginTop: 16, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <span style={{ fontSize: 16, marginTop: 1 }}>📍</span>
@@ -294,17 +318,13 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                   </div>
                 </div>
               </div>
-
               <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
                 {cart.map((item, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 12 }}>
                     {item.image && <img src={item.image} alt={item.name} style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ color: "#fff", fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{item.name}</p>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {item.size && <span style={{ color: "#555", fontSize: 11 }}>Size: <b style={{ color: "#888" }}>{item.size}</b></span>}
-                        {item.league && <span style={{ color: "#555", fontSize: 11 }}>{item.league}</span>}
-                      </div>
+                      {item.size && <span style={{ color: "#555", fontSize: 11 }}>Size: <b style={{ color: "#888" }}>{item.size}</b></span>}
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                         <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 700 }}>↓61%</span>
                         <span style={{ color: "#c8ff00", fontWeight: 700, fontSize: 15 }}>₹{item.price}</span>
@@ -314,17 +334,15 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                   </div>
                 ))}
               </div>
-
               <div style={{ padding: "0 20px 20px" }}>
-                <button onClick={() => setStep(3)}
-                  style={{ width: "100%", padding: 13, background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                <button onClick={() => setStep(3)} style={{ width: "100%", padding: 13, background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                   Continue to Payment →
                 </button>
               </div>
             </div>
           )}
 
-          {/* ══ STEP 3 — PAYMENT ══ */}
+          {/* STEP 3 */}
           {step === 3 && (
             <div style={sectionBox}>
               <div style={sectionHead}>
@@ -334,10 +352,7 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                 </div>
                 <button onClick={() => setStep(2)} style={{ background: "none", border: "1px solid #2a2a2a", borderRadius: 8, color: "#c8ff00", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", padding: "6px 14px", fontFamily: "'DM Sans', sans-serif" }}>Edit Order</button>
               </div>
-
               <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-
-                {/* Applied offer banner */}
                 {appliedOffer && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -347,8 +362,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     <button onClick={() => setAppliedOffer(null)} style={{ background: "none", border: "none", color: "#555", fontSize: 12, cursor: "pointer" }}>Remove</button>
                   </div>
                 )}
-
-                {/* Change offer option */}
                 {offers.length > 0 && !appliedOffer && (
                   <div style={{ border: "1px dashed #222", borderRadius: 10, padding: "12px 14px" }}>
                     <p style={{ color: "#444", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Apply an offer</p>
@@ -366,13 +379,11 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     </div>
                   </div>
                 )}
-
-                {/* Payment options */}
                 {[
-                  { id: "upi",        icon: "📱", label: "UPI",               sub: "Google Pay, PhonePe, Paytm, BHIM" },
+                  { id: "upi",        icon: "📱", label: "UPI",                sub: "Google Pay, PhonePe, Paytm, BHIM" },
                   { id: "card",       icon: "💳", label: "Credit / Debit Card", sub: "Visa, Mastercard, RuPay" },
-                  { id: "netbanking", icon: "🏦", label: "Net Banking",        sub: "All major banks supported" },
-                  { id: "cod",        icon: "💵", label: "Cash on Delivery",   sub: "Pay when your order arrives" },
+                  { id: "netbanking", icon: "🏦", label: "Net Banking",         sub: "All major banks supported" },
+                  { id: "cod",        icon: "💵", label: "Cash on Delivery",    sub: "Pay when your order arrives" },
                 ].map(opt => (
                   <div key={opt.id} className="pay-opt" onClick={() => setPayMethod(opt.id)}
                     style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 16px", background: payMethod === opt.id ? "rgba(200,255,0,0.05)" : "#0d0d0d", border: `2px solid ${payMethod === opt.id ? "#c8ff00" : "#1e1e1e"}`, borderRadius: 12, transition: "all 0.15s" }}>
@@ -386,20 +397,15 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     </div>
                   </div>
                 ))}
-
                 {payMethod === "upi" && (
                   <div style={{ marginTop: 4 }}>
                     <label style={labelSm}>UPI ID</label>
                     <input type="text" className="co-inp" value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi" style={inp} />
                   </div>
                 )}
-
                 {payMethod === "card" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-                    <div>
-                      <label style={labelSm}>Card Number</label>
-                      <input type="text" className="co-inp" placeholder="1234 5678 9012 3456" maxLength={19} style={inp} />
-                    </div>
+                    <div><label style={labelSm}>Card Number</label><input type="text" className="co-inp" placeholder="1234 5678 9012 3456" maxLength={19} style={inp} /></div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                       <div><label style={labelSm}>Expiry (MM/YY)</label><input type="text" className="co-inp" placeholder="MM/YY" maxLength={5} style={inp} /></div>
                       <div><label style={labelSm}>CVV</label><input type="password" className="co-inp" placeholder="•••" maxLength={3} style={inp} /></div>
@@ -407,37 +413,33 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                     <div><label style={labelSm}>Cardholder Name</label><input type="text" className="co-inp" placeholder="As on card" style={inp} /></div>
                   </div>
                 )}
-
                 {payMethod === "cod" && (
                   <div style={{ background: "rgba(250,204,21,0.06)", border: "1px solid rgba(250,204,21,0.15)", borderRadius: 10, padding: "12px 16px", marginTop: 4 }}>
                     <p style={{ color: "#facc15", fontWeight: 700, fontSize: 13, marginBottom: 4 }}>⚠️ Cash on Delivery</p>
                     <p style={{ color: "#555", fontSize: 12 }}>Please keep exact change of ₹{finalTotal} ready.</p>
                   </div>
                 )}
-
                 <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                  {["🔒 100% Secure", "✅ SSL Encrypted", "🏆 10L+ customers"].map(b => (
+                  {["🔒 100% Secure", "✅ SSL Encrypted", "🏆 Razorpay Powered"].map(b => (
                     <span key={b} style={{ fontSize: 10, color: "#444", fontWeight: 600, padding: "4px 10px", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 20 }}>{b}</span>
                   ))}
                 </div>
-
                 <button onClick={placeOrder} disabled={placing}
                   style={{ padding: 14, background: placing ? "#1a1a1a" : "#c8ff00", border: "none", borderRadius: 10, color: placing ? "#444" : "#0a0a0a", fontWeight: 700, fontSize: 14, letterSpacing: "0.08em", textTransform: "uppercase", cursor: placing ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
-                  {placing ? "Placing Order..." : `Place Order · ₹${finalTotal}`}
+                  {placing ? "Processing..." : payMethod === "cod" ? `Place Order · ₹${finalTotal}` : `Pay ₹${finalTotal} →`}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── RIGHT COLUMN — PRICE SUMMARY ── */}
+        {/* Right column */}
         <div style={{ position: "sticky", top: 80 }}>
           <div style={sectionBox}>
             <div style={{ ...sectionHead, borderBottom: "1px solid #1a1a1a" }}>
               <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>Price Details</h3>
               <span style={{ color: "#444", fontSize: 12 }}>{cart.length} item{cart.length !== 1 ? "s" : ""}</span>
             </div>
-
             <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#555", fontSize: 13 }}>Price ({cart.length} item{cart.length !== 1 ? "s" : ""})</span>
@@ -451,7 +453,7 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <span style={{ color: "#555", fontSize: 13 }}>Offer Discount</span>
-                    <p style={{ color: "#22c55e", fontSize: 10, marginTop: 2 }}>🎉 {appliedOffer?.label} off · {appliedOffer?.sub}</p>
+                    <p style={{ color: "#22c55e", fontSize: 10, marginTop: 2 }}>🎉 {appliedOffer?.label} off</p>
                   </div>
                   <span style={{ color: "#22c55e", fontWeight: 700, fontSize: 13 }}>− ₹{discount}</span>
                 </div>
@@ -462,7 +464,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
               </div>
               <p style={{ color: "#22c55e", fontSize: 11, fontWeight: 600 }}>You will save ₹{Math.round(total * 0.61) + discount} on this order</p>
             </div>
-
             <div style={{ borderTop: "1px solid #1a1a1a", padding: "14px 20px" }}>
               <p style={{ color: "#444", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Items in Cart</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -478,7 +479,6 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
                 ))}
               </div>
             </div>
-
             <div style={{ borderTop: "1px solid #1a1a1a", padding: "12px 20px", display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 16 }}>🔒</span>
               <p style={{ color: "#333", fontSize: 11 }}>Safe and Secure Payments. Easy returns. 100% Authentic products.</p>
@@ -494,9 +494,9 @@ export default function Checkout({ cart, total, finalTotal: propFinalTotal, user
           <p style={{ color: "#555", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Total</p>
           <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.5rem", color: "#c8ff00" }}>₹{finalTotal}</p>
         </div>
-        {step === 1 && <button onClick={() => { if (!fullName||phone.length!==10||pincode.length!==6||!address1||!city){alert("Please fill all required address fields");return;} setStep(2); }} style={{ padding: "12px 24px", background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Continue →</button>}
+        {step === 1 && <button onClick={() => { if (!fullName||phone.length!==10||pincode.length!==6||!address1||!city){alert("Please fill all required fields");return;} setStep(2); }} style={{ padding: "12px 24px", background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Continue →</button>}
         {step === 2 && <button onClick={() => setStep(3)} style={{ padding: "12px 24px", background: "#c8ff00", border: "none", borderRadius: 10, color: "#0a0a0a", fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>To Payment →</button>}
-        {step === 3 && <button onClick={placeOrder} disabled={placing} style={{ padding: "12px 24px", background: placing?"#1a1a1a":"#c8ff00", border: "none", borderRadius: 10, color: placing?"#444":"#0a0a0a", fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", cursor: placing?"not-allowed":"pointer", fontFamily: "'DM Sans', sans-serif" }}>{placing?"Placing...":"Place Order"}</button>}
+        {step === 3 && <button onClick={placeOrder} disabled={placing} style={{ padding: "12px 24px", background: placing?"#1a1a1a":"#c8ff00", border: "none", borderRadius: 10, color: placing?"#444":"#0a0a0a", fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", cursor: placing?"not-allowed":"pointer", fontFamily: "'DM Sans', sans-serif" }}>{placing?"Processing...":"Place Order"}</button>}
       </div>
     </div>
   );

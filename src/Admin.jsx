@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 
-const API = "http://127.0.0.1:5000";
+const API = "https://kickoff-11.up.railway.app";
 const sportEmoji = { Football: "⚽", Cricket: "🏏", Basketball: "🏀", Kabaddi: "🤼", Hockey: "🏑", Tennis: "🎾", default: "🏆" };
 
-/* ══════════════════════════════════════════
-   🔑 AUTH HELPERS — add these 3 functions
-   ══════════════════════════════════════════ */
 const getToken = () => sessionStorage.getItem("adminAuth");
 
 const authFetch = (url, opts = {}) => fetch(url, {
@@ -24,9 +21,6 @@ const authFetchFile = (url, opts = {}) => fetch(url, {
   },
 });
 
-// ═══════════════════════════════════════════════════════
-// ProductForm — unchanged
-// ═══════════════════════════════════════════════════════
 function ProductForm({ name, setName, category, setCategory, price, setPrice, league, setLeague, leagues,
   imagePreview, onFrontImageChange, backImagePreview, onBackImageChange,
   hlColor, setHlColor, hlPattern, setHlPattern, hlFabric, setHlFabric,
@@ -126,9 +120,6 @@ function ProductForm({ name, setName, category, setCategory, price, setPrice, le
   );
 }
 
-// ═══════════════════════════════════════════════════════
-// ProductCard — unchanged
-// ═══════════════════════════════════════════════════════
 function ProductCard({ p, onEdit, onDelete }) {
   const catColors = { Football: "bg-blue-100 text-blue-700", Cricket: "bg-green-100 text-green-700", "Retro Jersey": "bg-purple-100 text-purple-700", Basketball: "bg-orange-100 text-orange-700", Kabaddi: "bg-red-100 text-red-700" };
   return (
@@ -162,9 +153,6 @@ function ProductCard({ p, onEdit, onDelete }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════
-// LeagueForm — unchanged
-// ═══════════════════════════════════════════════════════
 function LeagueForm({ lName, setLName, lSport, setLSport, lCountry, setLCountry, lLogoPreview, onLogoChange, onSubmit, submitLabel, uploading, onCancel }) {
   const inp = "w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition text-sm";
   return (
@@ -216,9 +204,6 @@ function LeagueForm({ lName, setLName, lSport, setLSport, lCountry, setLCountry,
   );
 }
 
-// ═══════════════════════════════════════════════════════
-// MAIN ADMIN — only the fetch calls are changed
-// ═══════════════════════════════════════════════════════
 function Admin({ goBack, refresh }) {
   const [products, setProducts]   = useState([]);
   const [orders,   setOrders]     = useState([]);
@@ -251,7 +236,6 @@ function Admin({ goBack, refresh }) {
   const [lLogo,        setLLogo]        = useState(null);
   const [lLogoPreview, setLLogoPreview] = useState(null);
 
-  /* ── Loaders — ✅ CHANGED: orders uses authFetch ── */
   const loadProducts = () => fetch(`${API}/products`).then(r => r.json()).then(setProducts).catch(() => {});
   const loadOrders   = () => authFetch(`${API}/orders`).then(r => r.json()).then(setOrders).catch(() => {});
   const loadLeagues  = () => fetch(`${API}/leagues`).then(r => r.json()).then(setLeagues).catch(() => {});
@@ -265,7 +249,6 @@ function Admin({ goBack, refresh }) {
   };
   const cancelProductEdit = () => { resetProductForm(); setIsEditing(false); setActiveTab("manage"); };
 
-  /* ── ✅ CHANGED: upload uses authFetchFile ── */
   const uploadImage = async (file) => {
     if (!file) return null;
     const fd = new FormData();
@@ -286,7 +269,6 @@ function Admin({ goBack, refresh }) {
     highlights: { color: hlColor, pattern: hlPattern, fabric: hlFabric, fit: hlFit, occasion: hlOccasion, material: hlMaterial },
   });
 
-  /* ── ✅ CHANGED: all write operations use authFetch ── */
   const handleAddProduct = async () => {
     if (!name || !price || !imagePreview) { alert("Fill Name, Price and Front Image"); return; }
     let frontUrl = imagePreview;
@@ -295,10 +277,7 @@ function Admin({ goBack, refresh }) {
     if (backImage) backUrl  = await uploadImage(backImage);
     if (!frontUrl) return;
     try {
-      const res = await authFetch(`${API}/add-product`, {
-        method: "POST",
-        body: JSON.stringify(buildProductPayload(frontUrl, backUrl))
-      });
+      const res = await authFetch(`${API}/add-product`, { method: "POST", body: JSON.stringify(buildProductPayload(frontUrl, backUrl)) });
       if (!res.ok) throw new Error((await res.json()).error);
       alert("Product added! ✅"); resetProductForm(); loadProducts(); refresh();
     } catch (err) { alert("Failed: " + err.message); }
@@ -312,10 +291,7 @@ function Admin({ goBack, refresh }) {
     if (backImage) backUrl  = await uploadImage(backImage);
     if (!frontUrl) return;
     try {
-      const res = await authFetch(`${API}/update-product/${editingId}`, {
-        method: "PUT",
-        body: JSON.stringify(buildProductPayload(frontUrl, backUrl))
-      });
+      const res = await authFetch(`${API}/update-product/${editingId}`, { method: "PUT", body: JSON.stringify(buildProductPayload(frontUrl, backUrl)) });
       if (!res.ok) throw new Error((await res.json()).error);
       alert("Updated! ✅"); cancelProductEdit(); loadProducts(); refresh();
     } catch (err) { alert("Failed: " + err.message); }
@@ -346,10 +322,7 @@ function Admin({ goBack, refresh }) {
     let logoUrl = lLogoPreview || "";
     if (lLogo) logoUrl = await uploadImage(lLogo) || "";
     try {
-      const res = await authFetch(`${API}/leagues`, {
-        method: "POST",
-        body: JSON.stringify({ name: lName, sport: lSport, country: lCountry, logo: logoUrl })
-      });
+      const res = await authFetch(`${API}/leagues`, { method: "POST", body: JSON.stringify({ name: lName, sport: lSport, country: lCountry, logo: logoUrl }) });
       if (!res.ok) throw new Error((await res.json()).error);
       alert("League added! ✅"); resetLeagueForm(); loadLeagues();
     } catch (err) { alert("Failed: " + err.message); }
@@ -360,10 +333,7 @@ function Admin({ goBack, refresh }) {
     let logoUrl = lLogoPreview || "";
     if (lLogo) logoUrl = await uploadImage(lLogo) || "";
     try {
-      const res = await authFetch(`${API}/leagues/${editingLeagueId}`, {
-        method: "PUT",
-        body: JSON.stringify({ name: lName, sport: lSport, country: lCountry, logo: logoUrl })
-      });
+      const res = await authFetch(`${API}/leagues/${editingLeagueId}`, { method: "PUT", body: JSON.stringify({ name: lName, sport: lSport, country: lCountry, logo: logoUrl }) });
       if (!res.ok) throw new Error((await res.json()).error);
       alert("League updated! ✅"); resetLeagueForm(); loadLeagues();
     } catch (err) { alert("Failed: " + err.message); }
@@ -378,10 +348,7 @@ function Admin({ goBack, refresh }) {
   const startEditLeague  = (l) => { setEditingLeagueId(l._id); setLName(l.name); setLSport(l.sport); setLCountry(l.country || ""); setLLogoPreview(l.logo || ""); setLLogo(null); setIsEditingLeague(true); };
   const handleLogoChange = (e) => { const f = e.target.files[0]; if (!f) return; setLLogo(f); const r = new FileReader(); r.onloadend = () => setLLogoPreview(r.result); r.readAsDataURL(f); };
 
-  const formProps = { name, setName, category, setCategory, price, setPrice, league, setLeague, leagues,
-    imagePreview, onFrontImageChange: handleFrontImageChange, backImagePreview, onBackImageChange: handleBackImageChange,
-    hlColor, setHlColor, hlPattern, setHlPattern, hlFabric, setHlFabric,
-    hlFit, setHlFit, hlOccasion, setHlOccasion, hlMaterial, setHlMaterial, uploading };
+  const formProps = { name, setName, category, setCategory, price, setPrice, league, setLeague, leagues, imagePreview, onFrontImageChange: handleFrontImageChange, backImagePreview, onBackImageChange: handleBackImageChange, hlColor, setHlColor, hlPattern, setHlPattern, hlFabric, setHlFabric, hlFit, setHlFit, hlOccasion, setHlOccasion, hlMaterial, setHlMaterial, uploading };
   const leagueFormProps = { lName, setLName, lSport, setLSport, lCountry, setLCountry, lLogoPreview, onLogoChange: handleLogoChange, uploading };
 
   return (
@@ -392,7 +359,6 @@ function Admin({ goBack, refresh }) {
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
             <p className="text-gray-500 text-sm mt-0.5">Manage your KICKOFF Store</p>
           </div>
-          {/* ✅ CHANGED: clears token on logout */}
           <button onClick={() => { sessionStorage.removeItem("adminAuth"); goBack(); }}
             className="flex items-center gap-2 bg-black hover:bg-gray-900 text-white font-semibold px-6 py-2.5 rounded-lg transition">
             ← Back to Store
@@ -459,9 +425,6 @@ function Admin({ goBack, refresh }) {
 
         {activeTab === "leagues" && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Manage Leagues</h2>
-            </div>
             <div className="mb-8">
               <h3 className="text-lg font-bold text-gray-800 mb-3">{isEditingLeague ? "Edit League" : "Add New League"}</h3>
               <LeagueForm {...leagueFormProps}
@@ -506,12 +469,14 @@ function Admin({ goBack, refresh }) {
               <div className="space-y-4">
                 {orders.map((o, i) => (
                   <div key={i} className="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition">
-                    <div className="grid md:grid-cols-3 gap-6">
+                    <div className="grid md:grid-cols-4 gap-6">
+                      <div><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Order ID</p><p className="text-gray-900 font-mono text-sm">OD{String(o._id).slice(-8).toUpperCase()}</p></div>
                       <div><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Items</p><p className="text-gray-900 font-medium text-sm">{Array.isArray(o.items) ? o.items.map(it => it.name || it).join(", ") : o.items}</p></div>
                       <div><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Total</p><p className="text-2xl font-bold text-green-600">₹{o.total}</p></div>
                       <div><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Date</p><p className="text-gray-900 text-sm">{new Date(o.date).toLocaleString()}</p></div>
                     </div>
-                    {o.address && <div className="mt-4 pt-4 border-t"><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Address</p><p className="text-gray-700 text-sm">{o.address}</p></div>}
+                    {o.paymentId && <div className="mt-3"><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Payment ID</p><p className="text-gray-700 text-sm font-mono">{o.paymentId}</p></div>}
+                    {o.address && <div className="mt-3 pt-3 border-t"><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Address</p><p className="text-gray-700 text-sm">{o.address}</p></div>}
                     {o.user && <div className="mt-2"><p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Customer</p><p className="text-gray-700 text-sm">{o.user}</p></div>}
                   </div>
                 ))}

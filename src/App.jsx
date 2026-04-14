@@ -5,7 +5,7 @@ import ProductDetail from "./ProductDetail";
 import Checkout from "./Checkout";
 import ProfilePanel from "./ProfilePanel";   // ← NEW
 
-const API = "http://127.0.0.1:5000";
+const API = "https://kickoff-11.up.railway.app";
 const sportEmoji = { Football: "⚽", Cricket: "🏏", Basketball: "🏀", Kabaddi: "🤼", Hockey: "🏑", Tennis: "🎾", default: "🏆" };
 
 /* ─── persistent cart helpers ─── */

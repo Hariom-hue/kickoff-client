@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-const API = "http://127.0.0.1:5000";
+const API = "https://kickoff-11.up.railway.app";
 
 export default function ProductDetail({
   product, user, setUser,
