@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Admin from "./Admin";
 import AdminLogin from "./Adminlogin";
 import ProductDetail from "./ProductDetail";
-import Checkout from "./Checkout";
+import Checkout from "./checkout";
 import ProfilePanel from "./Profilepanel";   // ← NEW
 
 const API = "https://kickoff-11.up.railway.app";
