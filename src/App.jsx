@@ -3,7 +3,7 @@ import Admin from "./Admin";
 import AdminLogin from "./Adminlogin";
 import ProductDetail from "./ProductDetail";
 import Checkout from "./Checkout";
-import ProfilePanel from "./ProfilePanel";   // ← NEW
+import ProfilePanel from "./Profilepanel";   // ← NEW
 
 const API = "https://kickoff-11.up.railway.app";
 const sportEmoji = { Football: "⚽", Cricket: "🏏", Basketball: "🏀", Kabaddi: "🤼", Hockey: "🏑", Tennis: "🎾", default: "🏆" };
