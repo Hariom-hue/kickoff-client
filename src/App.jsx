@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Admin from "./Admin";
 import AdminLogin from "./Adminlogin";
 import ProductDetail from "./ProductDetail";
-import Checkout from "./Checkout";
-import ProfilePanel from "./ProfilePanel";
+import Checkout from "./Checkoutpage";
+import ProfilePanel from "./ProfileView";
 
 const API = "https://kickoff-11.up.railway.app";   // ← Railway backend
 const sportEmoji = { Football: "⚽", Cricket: "🏏", Basketball: "🏀", Kabaddi: "🤼", Hockey: "🏑", Tennis: "🎾", default: "🏆" };
