@@ -570,12 +570,8 @@ function Sidebar({ setShowSidebar, setShowAdminLogin, goHome, leagues, goLeague,
             </button>
           ))}
         </div>
-        <div style={{ marginTop:"auto",paddingTop:20,borderTop:"1px solid #1e1e1e" }}>
-          <button onClick={()=>{setShowAdminLogin(true);setShowSidebar(false);}}
-            style={{ width:"100%",padding:"10px 12px",background:"none",border:"1px solid #2a2a2a",borderRadius:9,color:"#555",fontSize:12,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase",cursor:"pointer",fontFamily:"'DM Sans',sans-serif" }}>
-            Admin Panel
-          </button>
-        </div>
+        
+        {/* 🔒 ADMIN BUTTON REMOVED - Access via /admin URL only */}
       </div>
     </div>
   );
